@@ -1,39 +1,11 @@
-FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
+# The below Docker code creates an executable jar and then creates an Docker Image out of it.
+FROM gradle:8.7-jdk21-alpine AS build
+COPY --chown=gradle:gradle . /home/gradle/src
+WORKDIR /home/gradle/src
+RUN gradle build -x test --no-daemon
 
-RUN mkdir /project
-
-COPY . /project
-
-# Passed from Github Actions
-ARG GIT_VERSION_TAG=unspecified
-ARG GIT_COMMIT_MESSAGE=unspecified
-ARG GIT_VERSION_HASH=unspecified
-
-WORKDIR /project
-
-# You can read these files for the information in your application
-RUN echo $GIT_VERSION_TAG > GIT_VERSION_TAG.txt
-RUN echo $GIT_COMMIT_MESSAGE > GIT_COMMIT_MESSAGE.txt
-RUN echo $GIT_VERSION_HASH > GIT_VERSION_HASH.txt
-
-RUN mvn clean package
-
-#FROM adoptopenjdk/openjdk21:eclipse-temurin-21-alpine
-#FROM bellsoft/liberica-openjdk-debian:21
-#FROM openjdk:21-slim
-FROM amazoncorretto:21-alpine-jdk
-LABEL maintainer="hendisantika@yahoo.co.id"
-
+FROM bellsoft/liberica-openjdk-debian:21 AS production
+EXPOSE 8080
 RUN mkdir /app
-
-RUN addgroup -g 1001 -S hendigroup
-
-RUN adduser -S hendi -u 1001
-
-COPY --from=build /project/target/*.jar /app/app.jar
-
-WORKDIR /app
-
-RUN chown -R hendi:hendigroup /app
-
-CMD java $JAVA_OPTS -jar bmi.jar
+COPY --from=build /home/gradle/src/build/libs/*.jar /app/app.jar
+ENTRYPOINT ["java","-jar","app/app-*.jar"]
